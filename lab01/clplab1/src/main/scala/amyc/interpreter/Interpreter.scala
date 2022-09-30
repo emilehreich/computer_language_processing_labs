@@ -82,8 +82,14 @@ object Interpreter extends Pipeline[(Program, SymbolTable), Unit] {
         case Times(lhs, rhs) =>
           IntValue(interpret(lhs).asInt * interpret(rhs).asInt)
         case Div(lhs, rhs) =>
+          if (interpret(rhs).asInt == 0) {
+            ctx.reporter.fatal(s"Error: Division by zero@${expr.position}")
+          }
           IntValue(interpret(lhs).asInt / interpret(rhs).asInt)
         case Mod(lhs, rhs) =>
+          if (interpret(rhs).asInt == 0) {
+            ctx.reporter.fatal(s"Error: Division by zero@${expr.position}")
+          }
           IntValue(interpret(lhs).asInt % interpret(rhs).asInt)
         case LessThan(lhs, rhs) =>
           BooleanValue(interpret(lhs).asInt < interpret(rhs).asInt)
