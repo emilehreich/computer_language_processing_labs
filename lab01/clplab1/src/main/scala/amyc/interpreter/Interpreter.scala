@@ -82,15 +82,11 @@ object Interpreter extends Pipeline[(Program, SymbolTable), Unit] {
         case Times(lhs, rhs) =>
           IntValue(interpret(lhs).asInt * interpret(rhs).asInt)
         case Div(lhs, rhs) =>
-          if (interpret(rhs).asInt == 0) {
-            ctx.reporter.fatal(s"Error: Division by zero@${expr.position}")
-          }
-          IntValue(interpret(lhs).asInt / interpret(rhs).asInt)
+          if (interpret(rhs).asInt == 0) then ctx.reporter.fatal(s"Error: Division by zero@${expr.position}")
+          else IntValue(interpret(lhs).asInt / interpret(rhs).asInt)
         case Mod(lhs, rhs) =>
-          if (interpret(rhs).asInt == 0) {
-            ctx.reporter.fatal(s"Error: Division by zero@${expr.position}")
-          }
-          IntValue(interpret(lhs).asInt % interpret(rhs).asInt)
+          if (interpret(rhs).asInt == 0) then ctx.reporter.fatal(s"Error: Division by zero@${expr.position}")
+          else IntValue(interpret(lhs).asInt % interpret(rhs).asInt)
         case LessThan(lhs, rhs) =>
           BooleanValue(interpret(lhs).asInt < interpret(rhs).asInt)
         case LessEquals(lhs, rhs) =>
@@ -134,7 +130,8 @@ object Interpreter extends Pipeline[(Program, SymbolTable), Unit] {
         case Let(df, value, body) =>
           interpret(body)(locals + (df.name -> interpret(value)))
         case Ite(cond, thenn, elze) =>
-          if interpret(cond).asBoolean then interpret(thenn) else interpret(elze)
+          if interpret(cond).asBoolean then interpret(thenn) 
+          else interpret(elze)
         case Match(scrut, cases) =>
           // Hint: We give you a skeleton to implement pattern matching
           //       and the main body of the implementation
@@ -160,10 +157,9 @@ object Interpreter extends Pipeline[(Program, SymbolTable), Unit] {
               case (UnitValue, LiteralPattern(UnitLiteral())) =>
                 Some(List())
               case (CaseClassValue(con1, realArgs), CaseClassPattern(con2, formalArgs)) =>
-                if (con1 == con2) then
+                if con1 == con2 then
                   val matches = realArgs.zip(formalArgs).map { case (v, p) => matchesPattern(v, p) }
-                  if matches.forall(_.isDefined) then Some(matches.flatten.flatten)
-                  else None  
+                  if matches.contains(None) then None else Some(matches.flatten.flatten)
                 else None
           }
 
@@ -173,7 +169,7 @@ object Interpreter extends Pipeline[(Program, SymbolTable), Unit] {
             MatchCase(pat, rhs) <- cases
             moreLocals <- matchesPattern(evS, pat)
           } {
-            interpret(rhs)(locals ++ moreLocals)
+            return interpret(rhs)(locals ++ moreLocals)
           }
           // No case matched: The program fails with a match error
           ctx.reporter.fatal(s"Match error: ${evS.toString}@${scrut.position}")
