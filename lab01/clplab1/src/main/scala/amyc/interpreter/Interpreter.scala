@@ -101,7 +101,7 @@ object Interpreter extends Pipeline[(Program, SymbolTable), Unit] {
           BooleanValue(interpret(lhs).asBoolean || interpret(rhs).asBoolean)
         case Equals(lhs, rhs) =>
           // Hint: Take care to implement Amy equality semantics
-          (interpret(lhs), interpret(rhs)) match {
+          (interpret(lhs), interpret(rhs)) match
             case (IntValue(i1), IntValue(i2)) => BooleanValue(i1 == i2)
             case (BooleanValue(b1), BooleanValue(b2)) => BooleanValue(b1 == b2)
             case (StringValue(s1), StringValue(s2)) => BooleanValue(s1 == s2)
@@ -109,9 +109,8 @@ object Interpreter extends Pipeline[(Program, SymbolTable), Unit] {
             case (CaseClassValue(c1, args1), CaseClassValue(c2, args2)) =>
               BooleanValue(c1 == c2 && args1.zip(args2).forall { case (v1, v2) => v1 == v2 })
             case _ => BooleanValue(false)
-          }
         case Concat(lhs, rhs) =>
-          StringValue(interpret(lhs).asString + interpret(rhs).asString)
+          StringValue(interpret(lhs).asString ++ interpret(rhs).asString)
         case Not(e) =>
           BooleanValue(!interpret(e).asBoolean)
         case Neg(e) =>
@@ -147,7 +146,7 @@ object Interpreter extends Pipeline[(Program, SymbolTable), Unit] {
           // Returns None when the pattern fails to match.
           // Note: Only works on well typed patterns (which have been ensured by the type checker).
           def matchesPattern(v: Value, pat: Pattern): Option[List[(Identifier, Value)]] = {
-            ((v, pat): @unchecked) match {
+            ((v, pat): @unchecked) match
               case (_, WildcardPattern()) =>
                 Some(List())
               case (_, IdPattern(name)) =>
@@ -163,10 +162,9 @@ object Interpreter extends Pipeline[(Program, SymbolTable), Unit] {
               case (CaseClassValue(con1, realArgs), CaseClassPattern(con2, formalArgs)) =>
                 if (con1 == con2) then
                   val matches = realArgs.zip(formalArgs).map { case (v, p) => matchesPattern(v, p) }
-                  if (matches.forall(_.isDefined)) then Some(matches.flatten.flatten)
+                  if matches.forall(_.isDefined) then Some(matches.flatten.flatten)
                   else None  
                 else None
-            }
           }
 
           // Main "loop" of the implementation: Go through every case,
