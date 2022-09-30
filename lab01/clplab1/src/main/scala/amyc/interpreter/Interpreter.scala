@@ -66,59 +66,74 @@ object Interpreter extends Pipeline[(Program, SymbolTable), Unit] {
     def interpret(expr: Expr)(implicit locals: Map[Identifier, Value]): Value = {
       expr match {
         case Variable(name) =>
-          ???
+          locals(name)
         case IntLiteral(i) =>
-          ???
+          IntValue(i)
         case BooleanLiteral(b) =>
-          ???
+          BooleanValue(b)
         case StringLiteral(s) =>
-          ???
+          StringValue(s)
         case UnitLiteral() =>
-          ???
+          UnitValue
         case Plus(lhs, rhs) =>
           IntValue(interpret(lhs).asInt + interpret(rhs).asInt)
         case Minus(lhs, rhs) =>
-          ???
+          IntValue(interpret(lhs).asInt - interpret(rhs).asInt)
         case Times(lhs, rhs) =>
-          ???
+          IntValue(interpret(lhs).asInt * interpret(rhs).asInt)
         case Div(lhs, rhs) =>
-          ???
+          IntValue(interpret(lhs).asInt / interpret(rhs).asInt)
         case Mod(lhs, rhs) =>
-          ???
+          IntValue(interpret(lhs).asInt % interpret(rhs).asInt)
         case LessThan(lhs, rhs) =>
-          ???
+          BooleanValue(interpret(lhs).asInt < interpret(rhs).asInt)
         case LessEquals(lhs, rhs) =>
-          ???
+          BooleanValue(interpret(lhs).asInt <= interpret(rhs).asInt)
         case And(lhs, rhs) =>
-          ???
+          BooleanValue(interpret(lhs).asBoolean && interpret(rhs).asBoolean)
         case Or(lhs, rhs) =>
-          ???
+          BooleanValue(interpret(lhs).asBoolean || interpret(rhs).asBoolean)
         case Equals(lhs, rhs) =>
-          ??? // Hint: Take care to implement Amy equality semantics
-          
+          // Hint: Take care to implement Amy equality semantics
+          (interpret(lhs), interpret(rhs)) match {
+            case (IntValue(i1), IntValue(i2)) => BooleanValue(i1 == i2)
+            case (BooleanValue(b1), BooleanValue(b2)) => BooleanValue(b1 == b2)
+            case (StringValue(s1), StringValue(s2)) => BooleanValue(s1 == s2)
+            case (UnitValue, UnitValue) => BooleanValue(true)
+            case (CaseClassValue(c1, args1), CaseClassValue(c2, args2)) =>
+              BooleanValue(c1 == c2 && args1.zip(args2).forall { case (v1, v2) => v1 == v2 })
+            case _ => BooleanValue(false)
+          }
         case Concat(lhs, rhs) =>
-          ???
+          StringValue(interpret(lhs).asString + interpret(rhs).asString)
         case Not(e) =>
-          ???
+          BooleanValue(!interpret(e).asBoolean)
         case Neg(e) =>
-          ???
+          IntValue(-interpret(e).asInt)
         case Call(qname, args) =>
-          ???
           // Hint: Check if it is a call to a constructor first,
           //       then if it is a built-in function (otherwise it is a normal function).
           //       Use the helper methods provided above to retrieve information from the symbol table.
           //       Think how locals should be modified.
-          
+          if isConstructor(qname) then CaseClassValue(qname, args.map(arg => interpret(arg)))
+          else 
+            val functionOwner = findFunctionOwner(qname)
+            if builtIns.contains(functionOwner, qname.name) then
+              builtIns(functionOwner, qname.name)(args.map(arg => interpret(arg)))
+            else 
+              val function = findFunction(functionOwner, qname.name)
+              interpret(function.body)(function.params.map(param => param.name).zip(args.map(arg => interpret(arg))).toMap)
         case Sequence(e1, e2) =>
-          ???
+          interpret(e1)
+          interpret(e2)
         case Let(df, value, body) =>
-          ???
+          interpret(body)(locals + (df.name -> interpret(value)))
         case Ite(cond, thenn, elze) =>
-          ???
+          if interpret(cond).asBoolean then interpret(thenn) else interpret(elze)
         case Match(scrut, cases) =>
           // Hint: We give you a skeleton to implement pattern matching
           //       and the main body of the implementation
-
+        
           val evS = interpret(scrut)
 
           // Returns a list of pairs id -> value,
@@ -128,19 +143,23 @@ object Interpreter extends Pipeline[(Program, SymbolTable), Unit] {
           def matchesPattern(v: Value, pat: Pattern): Option[List[(Identifier, Value)]] = {
             ((v, pat): @unchecked) match {
               case (_, WildcardPattern()) =>
-                ???
+                Some(List())
               case (_, IdPattern(name)) =>
                 Some(List(name -> v))
               case (IntValue(i1), LiteralPattern(IntLiteral(i2))) =>
-                ???
+                if i1 == i2 then Some(List()) else None
               case (BooleanValue(b1), LiteralPattern(BooleanLiteral(b2))) =>
-                ??? 
+                if b1 == b2 then Some(List()) else None
               case (StringValue(_), LiteralPattern(StringLiteral(_))) =>
-                ???
+                None
               case (UnitValue, LiteralPattern(UnitLiteral())) =>
-                ???
+                Some(List())
               case (CaseClassValue(con1, realArgs), CaseClassPattern(con2, formalArgs)) =>
-                ???
+                if (con1 == con2) then
+                  val matches = realArgs.zip(formalArgs).map { case (v, p) => matchesPattern(v, p) }
+                  if (matches.forall(_.isDefined)) then Some(matches.flatten.flatten)
+                  else None  
+                else None
             }
           }
 
@@ -150,14 +169,13 @@ object Interpreter extends Pipeline[(Program, SymbolTable), Unit] {
             MatchCase(pat, rhs) <- cases
             moreLocals <- matchesPattern(evS, pat)
           } {
-            return interpret(rhs)(locals ++ moreLocals)
+            interpret(rhs)(locals ++ moreLocals)
           }
           // No case matched: The program fails with a match error
           ctx.reporter.fatal(s"Match error: ${evS.toString}@${scrut.position}")
-
           
         case Error(msg) =>
-          ???
+          ctx.reporter.fatal(s"Error: ${msg}@${expr.position}")
       }
     }
 
